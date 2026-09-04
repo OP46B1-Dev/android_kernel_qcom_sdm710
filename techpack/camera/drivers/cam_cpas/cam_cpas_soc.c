@@ -9,6 +9,8 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/nvmem-consumer.h>
+#include <soc/qcom/socinfo.h>
 
 #include "cam_cpas_api.h"
 #include "cam_cpas_hw_intf.h"
@@ -17,6 +19,39 @@
 
 static uint cpas_dump;
 module_param(cpas_dump, uint, 0644);
+
+static int cam_cpas_init_ife_priority_wa(struct cam_hw_soc_info *soc_info)
+{
+	struct cam_cpas_private_soc *soc_private = soc_info->soc_private;
+	struct nvmem_cell *cell;
+	__le32 *revision;
+	size_t len;
+	u32 soc_id = socinfo_get_id();
+
+	/* SDM710/712 always need this; SDM670 only needs it on v1.1. */
+	if (soc_id == 360 || soc_id == 393) {
+		soc_private->ife_priority_wa = true;
+		return 0;
+	}
+	if (soc_id != 336)
+		return 0;
+
+	cell = nvmem_cell_get(soc_info->dev, "minor_rev");
+	if (IS_ERR(cell))
+		return PTR_ERR(cell);
+	revision = nvmem_cell_read(cell, &len);
+	nvmem_cell_put(cell);
+	if (IS_ERR(revision))
+		return PTR_ERR(revision);
+	if (len < sizeof(*revision)) {
+		kfree(revision);
+		return -EINVAL;
+	}
+	soc_private->ife_priority_wa =
+		((le32_to_cpu(*revision) >> 28) & 0x3) == 1;
+	kfree(revision);
+	return 0;
+}
 
 
 void cam_cpas_dump_axi_vote_info(
@@ -644,6 +679,10 @@ int cam_cpas_soc_init_resources(struct cam_hw_soc_info *soc_info,
 		rc = -ENOMEM;
 		goto release_res;
 	}
+
+	rc = cam_cpas_init_ife_priority_wa(soc_info);
+	if (rc)
+		goto free_soc_private;
 
 	rc = cam_cpas_get_custom_dt_info(cpas_hw, soc_info->pdev,
 		soc_info->soc_private);

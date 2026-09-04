@@ -64,4 +64,6 @@
 #define RPMH_REGULATOR_MODE_AUTO	3
 #define RPMH_REGULATOR_MODE_HPM		4
 
+#define RPMH_REGULATOR_LEVEL_OFF	0 /* sdm670 */
+
 #endif

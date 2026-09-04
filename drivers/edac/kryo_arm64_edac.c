@@ -40,6 +40,7 @@ module_param(poll_msec, int, 0444);
 #define L2_SILVER_BIT 0x1
 #define L3_BIT 0x2
 
+#define QCOM_CPU_PART_KRYO3XX_GOLD 0x802
 #define QCOM_CPU_PART_KRYO4XX_GOLD 0x804
 #define QCOM_CPU_PART_KRYO5XX_GOLD 0xD0D
 #define QCOM_CPU_PART_KRYO4XX_SILVER_V1 0x803
@@ -252,6 +253,7 @@ static void dump_err_reg(int errorcode, int level, u64 errxstatus, u64 errxmisc,
 	} else {
 		part_num = read_cpuid_part_number();
 		switch (part_num) {
+		case QCOM_CPU_PART_KRYO3XX_GOLD:
 		case QCOM_CPU_PART_KRYO4XX_SILVER_V1:
 		case QCOM_CPU_PART_KRYO4XX_SILVER_V2:
 			way = (int) KRYO_ERRXMISC_WAY(errxmisc) >> 2;
@@ -280,6 +282,7 @@ static void kryo_parse_l1_l2_cache_error(u64 errxstatus, u64 errxmisc,
 
 	part_num = read_cpuid_part_number();
 	switch (part_num) {
+	case QCOM_CPU_PART_KRYO3XX_GOLD:
 	case QCOM_CPU_PART_KRYO4XX_SILVER_V1:
 	case QCOM_CPU_PART_KRYO4XX_SILVER_V2:
 		switch (KRYO_ERRXMISC_LVL(errxmisc)) {

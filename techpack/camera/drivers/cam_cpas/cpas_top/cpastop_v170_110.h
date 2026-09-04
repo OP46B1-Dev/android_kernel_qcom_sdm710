@@ -521,6 +521,16 @@ static struct cam_cpas_hw_errata_wa_list cam170_cpas110_errata_wa_list = {
 			.value = 0, /* expected to be 0 */
 		},
 	},
+	/* SDM670 v1.1 IFE priority workaround (TCSR base + 0xb3e4). */
+	.tcsr_conn_box_spare_0 = {
+		.enable = true,
+		.data.reg_info = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.offset = 0xB3E4,
+			.value = 0x3,
+		},
+	},
 };
 
 struct cam_camnoc_fifo_lvl_info cam170_cpas110_camnoc_fifo_info = {

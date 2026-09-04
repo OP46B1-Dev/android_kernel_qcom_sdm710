@@ -222,10 +222,12 @@ struct cam_cpas_hw_errata_wa {
  *         camnoc slave pending transactions before turning off CPAS_TOP gdsc
  * @tcsr_camera_hf_sf_ares_glitch: Errata workaround info from ignoring
  *         erroneous signals at camera start
+ * @tcsr_conn_box_spare_0: IFE priority workaround for SDM670 v1.1/SDM710
  */
 struct cam_cpas_hw_errata_wa_list {
 	struct cam_cpas_hw_errata_wa camnoc_flush_slave_pending_trans;
 	struct cam_cpas_hw_errata_wa tcsr_camera_hf_sf_ares_glitch;
+	struct cam_cpas_hw_errata_wa tcsr_conn_box_spare_0;
 };
 
 /**

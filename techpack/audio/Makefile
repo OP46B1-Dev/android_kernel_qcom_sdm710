@@ -1,4 +1,10 @@
 # auto-detect subdirs
+ifeq ($(CONFIG_ARCH_SDM670), y)
+include $(srctree)/techpack/audio/config/sdm670auto.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/sdm670auto.conf)
+LINUXINCLUDE += -include $(srctree)/techpack/audio/config/sdm670autoconf.h
+endif
+
 ifeq ($(CONFIG_ARCH_SDXPOORWILLS), y)
 include $(srctree)/techpack/audio/config/sdxpoorwillsauto.conf
 export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/sdxpoorwillsauto.conf)

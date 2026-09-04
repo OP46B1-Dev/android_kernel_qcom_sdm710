@@ -194,6 +194,7 @@
 #define GPLL4							184
 #define GCC_CPUSS_DVM_BUS_CLK					185
 #define GCC_CPUSS_GNOC_CLK					186
+#define GPLL6						187
 
 /* GCC Resets */
 #define GCC_MMSS_BCR						0
@@ -222,6 +223,7 @@
 #define GCC_USB_PHY_CFG_AHB2PHY_BCR				23
 #define GCC_PCIE_0_PHY_BCR					24
 #define GCC_PCIE_1_PHY_BCR					25
+#define GCC_SDCC1_BCR						26
 
 /* GCC GDSCRs */
 #define PCIE_0_GDSC						0

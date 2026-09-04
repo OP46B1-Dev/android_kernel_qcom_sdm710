@@ -5,6 +5,7 @@
 
 #include <linux/clk-provider.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 
@@ -17,6 +18,9 @@
 #include "clk-regmap.h"
 #include "clk-pll.h"
 #include "gdsc.h"
+#include "vdd-level.h"
+
+static DEFINE_VDD_REGULATORS(vdd_cx, VDD_NUM, 1, vdd_corner);
 
 enum {
 	P_BI_TCXO,
@@ -42,9 +46,29 @@ static const char * const video_cc_parent_names_0[] = {
 	"core_bi_pll_test_se",
 };
 
-static const struct alpha_pll_config video_pll0_config = {
+static struct alpha_pll_config video_pll0_config = {
 	.l = 0x10,
 	.alpha = 0xaaab,
+};
+
+static struct pll_vco video_sdm670_vco[] = {
+	{ 249600000, 2000000000, 0 },
+	{ 125000000, 1000000000, 1 },
+};
+
+static const struct clk_init_data video_pll0_sdm670_init = {
+	.name = "video_pll0",
+	.parent_names = (const char *[]){ "bi_tcxo" },
+	.num_parents = 1,
+	.ops = &clk_alpha_pll_fabia_ops,
+	.vdd_class = &vdd_cx,
+	.num_rate_max = VDD_NUM,
+	.rate_max = (unsigned long[VDD_NUM]) {
+		[VDD_MIN] = 615000000,
+		[VDD_LOW] = 1066000000,
+		[VDD_LOW_L1] = 1600000000,
+		[VDD_NOMINAL] = 2000000000,
+	},
 };
 
 static struct clk_alpha_pll video_pll0 = {
@@ -68,6 +92,37 @@ static const struct freq_tbl ftbl_video_cc_venus_clk_src[] = {
 	F(444000000, P_VIDEO_PLL0_OUT_MAIN, 1, 0, 0),
 	F(533000000, P_VIDEO_PLL0_OUT_MAIN, 1, 0, 0),
 	{ }
+};
+
+/* SDM670 uses the same v4.19 VideoCC register map as SDM845, but its
+ * Venus operating points use a /2 divider for the intermediate rates. */
+static const struct freq_tbl ftbl_video_cc_venus_clk_src_sdm670[] = {
+	F(100000000, P_VIDEO_PLL0_OUT_MAIN, 4, 0, 0),
+	F(200000000, P_VIDEO_PLL0_OUT_MAIN, 2, 0, 0),
+	F(330000000, P_VIDEO_PLL0_OUT_MAIN, 2, 0, 0),
+	F(364700000, P_VIDEO_PLL0_OUT_MAIN, 2, 0, 0),
+	F(404000000, P_VIDEO_PLL0_OUT_MAIN, 1, 0, 0),
+	F(444000000, P_VIDEO_PLL0_OUT_MAIN, 1, 0, 0),
+	F(533000000, P_VIDEO_PLL0_OUT_MAIN, 1, 0, 0),
+	{ }
+};
+
+static const struct clk_init_data video_cc_venus_sdm670_init = {
+	.name = "video_cc_venus_clk_src",
+	.parent_names = video_cc_parent_names_0,
+	.num_parents = ARRAY_SIZE(video_cc_parent_names_0),
+	.flags = CLK_SET_RATE_PARENT,
+	.ops = &clk_rcg2_shared_ops,
+	.vdd_class = &vdd_cx,
+	.num_rate_max = VDD_NUM,
+	.rate_max = (unsigned long[VDD_NUM]) {
+		[VDD_MIN] = 100000000,
+		[VDD_LOWER] = 200000000,
+		[VDD_LOW] = 330000000,
+		[VDD_LOW_L1] = 404000000,
+		[VDD_NOMINAL] = 444000000,
+		[VDD_HIGH] = 533000000,
+	},
 };
 
 static struct clk_rcg2 video_cc_venus_clk_src = {
@@ -314,8 +369,16 @@ static const struct qcom_cc_desc video_cc_sdm845_desc = {
 	.num_gdscs = ARRAY_SIZE(video_cc_sdm845_gdscs),
 };
 
+/* The vendor Venus driver consumes the standalone GDSC regulators. */
+static const struct qcom_cc_desc video_cc_sdm670_desc = {
+	.config = &video_cc_sdm845_regmap_config,
+	.clks = video_cc_sdm845_clocks,
+	.num_clks = ARRAY_SIZE(video_cc_sdm845_clocks),
+};
+
 static const struct of_device_id video_cc_sdm845_match_table[] = {
 	{ .compatible = "qcom,sdm845-videocc" },
+	{ .compatible = "qcom,sdm670-videocc" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, video_cc_sdm845_match_table);
@@ -323,14 +386,32 @@ MODULE_DEVICE_TABLE(of, video_cc_sdm845_match_table);
 static int video_cc_sdm845_probe(struct platform_device *pdev)
 {
 	struct regmap *regmap;
+	const struct qcom_cc_desc *desc = &video_cc_sdm845_desc;
+	int ret;
 
-	regmap = qcom_cc_map(pdev, &video_cc_sdm845_desc);
+	if (of_device_is_compatible(pdev->dev.of_node, "qcom,sdm670-videocc")) {
+		vdd_cx.regulator[0] = devm_regulator_get(&pdev->dev, "vdd_cx");
+		if (IS_ERR(vdd_cx.regulator[0]))
+			return PTR_ERR(vdd_cx.regulator[0]);
+		desc = &video_cc_sdm670_desc;
+		video_pll0.vco_table = video_sdm670_vco;
+		video_pll0.num_vco = ARRAY_SIZE(video_sdm670_vco);
+		video_pll0.config = &video_pll0_config;
+		video_pll0.clkr.hw.init = &video_pll0_sdm670_init;
+		video_cc_venus_clk_src.clkr.hw.init = &video_cc_venus_sdm670_init;
+		video_cc_venus_clk_src.freq_tbl =
+			ftbl_video_cc_venus_clk_src_sdm670;
+	}
+
+	regmap = qcom_cc_map(pdev, desc);
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
 
-	clk_fabia_pll_configure(&video_pll0, regmap, &video_pll0_config);
+	ret = clk_fabia_pll_configure(&video_pll0, regmap, &video_pll0_config);
+	if (ret)
+		return ret;
 
-	return qcom_cc_really_probe(pdev, &video_cc_sdm845_desc, regmap);
+	return qcom_cc_really_probe(pdev, desc, regmap);
 }
 
 static struct platform_driver video_cc_sdm845_driver = {

@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 # auto-detect subdirs
+ifeq ($(CONFIG_ARCH_SDM670), y)
+include $(srctree)/techpack/camera/config/sdm670camera.conf
+LINUXINCLUDE += -include $(srctree)/techpack/camera/config/sdm670cameraconf.h
+endif
+
 ifeq ($(CONFIG_ARCH_KONA), y)
 include $(srctree)/techpack/camera/config/konacamera.conf
 endif
@@ -19,7 +24,8 @@ LINUXINCLUDE    += \
 		-include $(srctree)/techpack/camera/config/litocameraconf.h
 endif
 
-ifdef CONFIG_SPECTRA_CAMERA_KONA
+# Select this implementation through the platform techpack configuration.
+ifneq ($(filter y,$(CONFIG_SPECTRA_CAMERA_KONA) $(CONFIG_SPECTRA_CAMERA_SDM670)),)
 # Use USERINCLUDE when you must reference the UAPI directories only.
 USERINCLUDE     += \
                 -I$(srctree)/techpack/camera/include/uapi
@@ -29,5 +35,5 @@ USERINCLUDE     += \
 LINUXINCLUDE    += \
                 -I$(srctree)/techpack/camera/include/uapi \
                 -I$(srctree)/techpack/camera/include
-obj-y += drivers/
+obj-$(CONFIG_SPECTRA_CAMERA) += drivers/
 endif

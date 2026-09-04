@@ -1,0 +1,33 @@
+Qualcomm Technologies, Inc. SDM670 OSM clock controller
+
+The SDM670 Operating State Manager exposes independent L3, power-cluster,
+and performance-cluster domains. The controller owns the CPU frequency table
+and adds OPP entries for CPU and L3 consumers at probe time.
+
+Properties:
+- compatible: required, must be "qcom,clk-cpu-osm-sdm670".
+- reg: three memory regions in L3, power-cluster, performance-cluster order.
+- reg-names: "osm_l3_base", "osm_pwrcl_base", "osm_perfcl_base".
+- qcom,mx-turbo-freq: optional three-frequency array (Hz) marking the first
+  rate requiring a TURBO vote on the MX rail, in L3/power/perf order.
+- vdd_l3_mx_ao-supply and vdd_pwrcl_mx_ao-supply: required when
+  qcom,mx-turbo-freq is present; phandles to MX active-only regulators.
+- l3-devs: optional phandle list of devices receiving L3 OPP entries.
+- clocks / clock-names: required XO active-only clock, named "xo_ao".
+- #clock-cells: required and must be <1>.
+
+Example:
+	clock_cpucc: qcom,cpucc@17d41000 {
+		compatible = "qcom,clk-cpu-osm-sdm670";
+		reg = <0x17d41000 0x1400>,
+		      <0x17d43000 0x1400>,
+		      <0x17d45800 0x1400>;
+		reg-names = "osm_l3_base", "osm_pwrcl_base", "osm_perfcl_base";
+		vdd_l3_mx_ao-supply = <&pm660l_s1_level_ao>;
+		vdd_pwrcl_mx_ao-supply = <&pm660l_s1_level_ao>;
+		qcom,mx-turbo-freq = <1440000000 1708000000 3300000001>;
+		l3-devs = <&l3_cpu0 &l3_cpu6 &l3_cdsp>;
+		clock-names = "xo_ao";
+		clocks = <&clock_rpmh RPMH_CXO_CLK_A>;
+		#clock-cells = <1>;
+	};

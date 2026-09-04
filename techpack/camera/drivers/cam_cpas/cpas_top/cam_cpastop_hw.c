@@ -236,6 +236,11 @@ static int cam_cpastop_setup_regbase_indices(struct cam_hw_soc_info *soc_info,
 		return -EINVAL;
 	}
 
+	rc = cam_common_util_get_string_index(soc_info->mem_block_name,
+		soc_info->num_mem_block, "core_top_csr_tcsr", &index);
+	if ((rc == 0) && (index < num_reg_map))
+		regbase_index[CAM_CPAS_REG_CSR_TCSR] = index;
+
 	return 0;
 }
 
@@ -585,6 +590,10 @@ done:
 static int cam_cpastop_poweron(struct cam_hw_info *cpas_hw)
 {
 	int i, reg_val;
+	int tcsr_index;
+	struct cam_cpas *cpas_core = (struct cam_cpas *)cpas_hw->core_info;
+	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
+	struct cam_cpas_private_soc *soc_private = soc_info->soc_private;
 	struct cam_cpas_hw_errata_wa_list *errata_wa_list =
 		camnoc_info->errata_wa_list;
 	struct cam_cpas_hw_errata_wa *errata_wa =
@@ -616,6 +625,15 @@ static int cam_cpastop_poweron(struct cam_hw_info *cpas_hw)
 		scm_io_write(errata_wa->data.reg_info.offset, reg_val);
 	}
 
+	errata_wa = &camnoc_info->errata_wa_list->tcsr_conn_box_spare_0;
+	tcsr_index = cpas_core->regbase_index[CAM_CPAS_REG_CSR_TCSR];
+	if (errata_wa->enable && soc_private->ife_priority_wa &&
+		tcsr_index >= 0) {
+		cam_io_w_mb(errata_wa->data.reg_info.value,
+			soc_info->reg_map[tcsr_index].mem_base +
+			errata_wa->data.reg_info.offset);
+	}
+
 	return 0;
 }
 
@@ -623,10 +641,12 @@ static int cam_cpastop_poweroff(struct cam_hw_info *cpas_hw)
 {
 	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
+	struct cam_cpas_private_soc *soc_private = soc_info->soc_private;
 	int camnoc_index = cpas_core->regbase_index[CAM_CPAS_REG_CAMNOC];
 	int rc = 0;
 	struct cam_cpas_hw_errata_wa_list *errata_wa_list =
 		camnoc_info->errata_wa_list;
+	int tcsr_index;
 
 	if (!errata_wa_list)
 		return 0;
@@ -649,6 +669,12 @@ static int cam_cpastop_poweroff(struct cam_hw_info *cpas_hw)
 			rc = 0;
 		}
 	}
+
+	tcsr_index = cpas_core->regbase_index[CAM_CPAS_REG_CSR_TCSR];
+	if (errata_wa_list->tcsr_conn_box_spare_0.enable &&
+		soc_private->ife_priority_wa && tcsr_index >= 0)
+		cam_io_w_mb(0, soc_info->reg_map[tcsr_index].mem_base +
+			errata_wa_list->tcsr_conn_box_spare_0.data.reg_info.offset);
 
 	return rc;
 }
